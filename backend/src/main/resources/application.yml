@@ -1,0 +1,33 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ai-engineering-assistant
+  servlet:
+    multipart:
+      max-file-size: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:60MB}
+      max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:65MB}
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/ai_engineering_assistant}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+app:
+  security:
+    jwt-secret: ${JWT_SECRET:change-this-development-secret-change-this-development-secret}
+    access-token-minutes: ${JWT_ACCESS_TOKEN_MINUTES:20}
+    refresh-token-days: ${JWT_REFRESH_TOKEN_DAYS:14}
+  storage:
+    repositories-dir: ${REPOSITORY_STORAGE_DIR:./data/repositories}
+  upload:
+    max-compressed-bytes: ${UPLOAD_MAX_COMPRESSED_BYTES:52428800}
+    max-expanded-bytes: ${UPLOAD_MAX_EXPANDED_BYTES:209715200}
+    max-entry-bytes: ${UPLOAD_MAX_ENTRY_BYTES:10485760}
+    max-files: ${UPLOAD_MAX_FILES:5000}
+    max-depth: ${UPLOAD_MAX_DEPTH:20}
+    max-compression-ratio: ${UPLOAD_MAX_COMPRESSION_RATIO:25}

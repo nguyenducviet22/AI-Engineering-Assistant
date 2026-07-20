@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:aiassistant;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+app:
+  security:
+    jwt-secret: test-secret-test-secret-test-secret-test-secret-test-secret
+    access-token-minutes: 20
+    refresh-token-days: 14
+  storage:
+    repositories-dir: ./target/test-repositories
