@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 
 vi.mock("../api/client", () => ({
+  AUTH_REQUIRED_EVENT: "aea.auth-required",
   clearSession: vi.fn(),
   createWorkspace: vi.fn(),
   currentUser: vi.fn(() => null),
