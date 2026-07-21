@@ -1,8 +1,10 @@
 # Plan: Phase 1 Foundation
 
-**Status:** draft
+**Status:** completed - Phase 1 verified and ready for Phase 2 planning
 
-**Baseline:** `git status --short` -> fails because this workspace is not currently recognized as a Git repository; `backend/` and `frontend/` contain only `.gitkeep`; `PROJECT_CONTEXT.md` referenced by `README.md` is missing.
+**Baseline:** Phase 1 implementation exists in `backend/` and `frontend/`; `git status --short` works and currently shows local configuration changes pending commit.
+
+**Pre-Phase 2 commit decision:** Commit `.codex/hooks.json` and `.vscode/settings.json` before starting Phase 2, but keep that as a small configuration/state commit separate from Phase 2 implementation work. `.vscode/settings.json` contains only a project-level Java build setting, and `.codex/hooks.json` is a hook schema/configuration change rather than Phase 2 product code.
 
 ## Task 1: Backend project foundation
 - Spec: SDS Sections 5, 6, 11, 38, 39, 40, 41, 47; SRS FR-001 to FR-011, NFR-004
