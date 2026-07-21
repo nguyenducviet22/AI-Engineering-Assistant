@@ -26,6 +26,7 @@ public class RepositoryVersion {
     }
 
     public Long getId() { return id; }
+    public ProjectRepository getRepository() { return repository; }
     public Integer getVersion() { return version; }
     public String getCommitHash() { return commitHash; }
     public Instant getUploadDate() { return uploadDate; }

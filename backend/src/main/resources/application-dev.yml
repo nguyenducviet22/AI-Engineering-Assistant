@@ -7,7 +7,15 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+  flyway:
+    enabled: false
 
 app:
   storage:
     repositories-dir: ./data/dev/repositories
+  indexing:
+    enabled: false
+    async-enabled: true
+  ai:
+    openrouter:
+      enabled: false

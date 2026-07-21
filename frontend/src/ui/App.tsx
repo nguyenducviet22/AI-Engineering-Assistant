@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FolderPlus, LogOut, UploadCloud } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import {
+  AUTH_REQUIRED_EVENT,
   clearSession,
   createWorkspace,
   currentUser,
@@ -19,6 +20,12 @@ const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
 export default function App() {
   const [user, setUser] = useState(currentUser());
+
+  useEffect(() => {
+    const handleAuthRequired = () => setUser(null);
+    window.addEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
+    return () => window.removeEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
+  }, []);
 
   if (!user) {
     return <AuthScreen onAuthenticated={(response) => setUser(response.user)} />;

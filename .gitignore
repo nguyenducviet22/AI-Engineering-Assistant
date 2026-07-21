@@ -1,4 +1,5 @@
 .harness/state/
+.env
 backend/target/
 backend/data/
 frontend/node_modules/

@@ -55,6 +55,11 @@ public class ProjectRepository {
     public Instant getCreatedAt() { return createdAt; }
     public List<RepositoryVersion> getVersions() { return versions; }
 
+    public void markValidating() {
+        this.status = RepositoryStatus.VALIDATING;
+        this.failureReason = null;
+    }
+
     public void markValidated(RepositoryMetadata metadata) {
         this.language = metadata.language();
         this.framework = metadata.framework();
@@ -66,6 +71,16 @@ public class ProjectRepository {
         this.status = RepositoryStatus.INDEXING;
         this.failureReason = null;
         this.versions.add(new RepositoryVersion(this, currentVersion));
+    }
+
+    public void markIndexing() {
+        this.status = RepositoryStatus.INDEXING;
+        this.failureReason = null;
+    }
+
+    public void markReady() {
+        this.status = RepositoryStatus.READY;
+        this.failureReason = null;
     }
 
     public void markFailed(String failureReason) {

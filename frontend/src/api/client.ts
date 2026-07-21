@@ -1,5 +1,7 @@
 import axios from "axios";
 
+export const AUTH_REQUIRED_EVENT = "aea.auth-required";
+
 export type UserProfile = {
   id: number;
   email: string;
@@ -50,6 +52,19 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const url = String(error?.config?.url ?? "");
+    if ((status === 401 || status === 403) && !url.startsWith("/auth/")) {
+      clearSession();
+      window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT));
+    }
+    return Promise.reject(error);
+  }
+);
+
 export function saveSession(response: TokenResponse) {
   localStorage.setItem("aea.accessToken", response.accessToken);
   localStorage.setItem("aea.refreshToken", response.refreshToken);
@@ -64,7 +79,15 @@ export function clearSession() {
 
 export function currentUser(): UserProfile | null {
   const raw = localStorage.getItem("aea.user");
-  return raw ? (JSON.parse(raw) as UserProfile) : null;
+  if (!raw) {
+    return null;
+  }
+  try {
+    return JSON.parse(raw) as UserProfile;
+  } catch {
+    clearSession();
+    return null;
+  }
 }
 
 export async function register(payload: { email: string; password: string; fullName: string }) {

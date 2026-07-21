@@ -151,9 +151,6 @@ class Phase1ApiTests {
         uploadZip(token, workspace.get("id").asLong(), "drive.zip", zipBytes(new Entry("C:/evil.java", "class Evil {}")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error", equalTo("Invalid ZIP Entry")));
-        uploadZip(token, workspace.get("id").asLong(), "nested.zip", zipBytes(new Entry("nested.zip", "not really zip")))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error", equalTo("Nested Archive Rejected")));
         uploadZip(token, workspace.get("id").asLong(), "bomb.zip", zipBytes(new Entry("src/main/java/App.java", "class App {}"),
                         new Entry("large.bin", "A".repeat(200_000))))
                 .andExpect(status().isBadRequest())
@@ -161,6 +158,31 @@ class Phase1ApiTests {
         uploadZip(token, workspace.get("id").asLong(), "empty.zip", zipBytes(new Entry("README.png", "binary-ish")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error", equalTo("Unsupported Repository")));
+    }
+
+    @Test
+    void repositoryUploadIgnoresNestedArchivesForFileCount() throws Exception {
+        String token = register("nested-owner@example.com");
+        JsonNode workspace = postJson("/api/v1/workspaces", token,
+                "{\"name\":\"Repo\",\"description\":\"Upload\",\"language\":\"Java\",\"framework\":\"Spring Boot\",\"visibility\":\"PRIVATE\"}");
+
+        uploadZip(token, workspace.get("id").asLong(), "nested-with-source.zip",
+                zipBytes(new Entry("src/main/java/App.java", "class App {}"), new Entry("reference/submission.zip", "not really zip")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fileCount", equalTo(1)));
+    }
+
+    @Test
+    void repositoryUploadStillAppliesCompressionLimitToIgnoredNestedArchives() throws Exception {
+        String token = register("nested-bomb-owner@example.com");
+        JsonNode workspace = postJson("/api/v1/workspaces", token,
+                "{\"name\":\"Repo\",\"description\":\"Upload\",\"language\":\"Java\",\"framework\":\"Spring Boot\",\"visibility\":\"PRIVATE\"}");
+
+        uploadZip(token, workspace.get("id").asLong(), "nested-bomb.zip",
+                zipBytes(new Entry("src/main/java/App.java", "class App {}"),
+                        new Entry("reference/submission.zip", "A".repeat(200_000))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error", equalTo("Suspicious Compression Ratio")));
     }
 
     @Test

@@ -31,12 +31,28 @@ public class RepositoryStorageService {
         }
     }
 
+    public Path sourceZipPath(Long workspaceId, Long repositoryId, int version) {
+        return versionDirectory(workspaceId, repositoryId, version).resolve("source.zip").normalize();
+    }
+
+    public Path extractedDirectory(Long workspaceId, Long repositoryId, int version) {
+        return versionDirectory(workspaceId, repositoryId, version).resolve("extracted").normalize();
+    }
+
     public void deleteRepository(Long workspaceId, Long repositoryId) {
         deleteDirectory(root.resolve("workspace-" + workspaceId).resolve("repository-" + repositoryId).normalize());
     }
 
     public void deleteWorkspace(Long workspaceId) {
         deleteDirectory(root.resolve("workspace-" + workspaceId).normalize());
+    }
+
+    private Path versionDirectory(Long workspaceId, Long repositoryId, int version) {
+        Path directory = root.resolve("workspace-" + workspaceId).resolve("repository-" + repositoryId).resolve("v" + version).normalize();
+        if (!directory.startsWith(root)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid Storage Path", "Repository storage path is unsafe.");
+        }
+        return directory;
     }
 
     private void deleteDirectory(Path target) {

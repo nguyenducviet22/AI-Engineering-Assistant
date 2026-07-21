@@ -42,10 +42,7 @@ public class ZipRepositoryValidator {
                     continue;
                 }
                 String extension = extension(entry.getName());
-                if (isNestedArchive(extension)) {
-                    throw new ApiException(HttpStatus.BAD_REQUEST, "Nested Archive Rejected", "Nested archives are not allowed in repository uploads.");
-                }
-                boolean ignored = shouldIgnore(entry.getName());
+                boolean ignored = shouldIgnore(entry.getName()) || isNestedArchive(extension);
                 long entryBytes = drainEntry(zip);
                 if (entryBytes > properties.maxEntryBytes()) {
                     throw new ApiException(HttpStatus.BAD_REQUEST, "File Too Large", "A repository file exceeds the per-file size limit.");

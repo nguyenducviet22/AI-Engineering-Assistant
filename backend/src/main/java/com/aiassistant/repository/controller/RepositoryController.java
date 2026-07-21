@@ -30,6 +30,11 @@ public class RepositoryController {
         return repositoryService.status(SecurityUtils.currentUser().id(), id);
     }
 
+    @PostMapping("/repositories/{id}/retry-indexing")
+    RepositoryStatusResponse retryIndexing(@PathVariable("id") Long id) {
+        return repositoryService.retryIndexing(SecurityUtils.currentUser().id(), id);
+    }
+
     @DeleteMapping("/repositories/{id}")
     void delete(@PathVariable("id") Long id) {
         repositoryService.delete(SecurityUtils.currentUser().id(), id);

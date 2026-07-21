@@ -7,6 +7,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+  flyway:
+    enabled: false
 
 app:
   security:
@@ -15,3 +17,16 @@ app:
     refresh-token-days: 14
   storage:
     repositories-dir: ./target/test-repositories
+  upload:
+    max-compressed-bytes: 52428800
+    max-expanded-bytes: 209715200
+    max-entry-bytes: 10485760
+    max-files: 5000
+    max-depth: 20
+    max-compression-ratio: 25
+  indexing:
+    enabled: false
+    async-enabled: true
+  ai:
+    openrouter:
+      enabled: false
