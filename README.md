@@ -63,6 +63,43 @@ npm run dev
 
 Vite proxies `/api` to `http://localhost:8080`.
 
+## Local PostgreSQL for Development
+
+This `docker-compose.yml` is a dev-local convenience for Phase 3 verification
+and Phase 2 repository indexing work. It is not the Phase 5 Docker deployment
+deliverable; Phase 5 will still handle full multi-service deployment,
+production configuration, health checks, and operational hardening.
+
+Start local PostgreSQL with pgvector:
+
+```bash
+docker compose up -d postgres
+```
+
+Stop the local container while keeping indexed data:
+
+```bash
+docker compose down
+```
+
+Reset the database and wipe indexed data:
+
+```bash
+docker compose down -v
+```
+
+The compose service matches backend defaults:
+
+```text
+DATABASE_URL=jdbc:postgresql://localhost:5432/ai_engineering_assistant
+DATABASE_USERNAME=postgres
+DATABASE_PASSWORD=postgres
+```
+
+The `postgres` password is the existing non-sensitive local placeholder from
+`application.yml`, not a production credential. The pgvector extension is
+created by Flyway migration `V2__repository_processing.sql`.
+
 ## Phase 1 API Surface
 
 - `POST /api/v1/auth/register`
