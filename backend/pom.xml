@@ -13,6 +13,7 @@
         <jjwt.version>0.12.6</jjwt.version>
         <javaparser.version>3.26.2</javaparser.version>
         <flyway.version>10.17.0</flyway.version>
+        <spring-ai.version>1.0.0-M6</spring-ai.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -20,6 +21,13 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
                 <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -61,6 +69,10 @@
             <groupId>com.github.javaparser</groupId>
             <artifactId>javaparser-core</artifactId>
             <version>${javaparser.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-openai-spring-boot-starter</artifactId>
         </dependency>
         <dependency>
             <groupId>io.jsonwebtoken</groupId>

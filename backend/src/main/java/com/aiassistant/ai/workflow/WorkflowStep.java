@@ -1,0 +1,14 @@
+package com.aiassistant.ai.workflow;
+
+public enum WorkflowStep {
+    START,
+    INTENT_DETECTION,
+    RETRIEVE_CONTEXT,
+    CONTEXT_VALIDATION,
+    PROMPT_SELECTION,
+    LLM_GENERATION,
+    OUTPUT_VALIDATION,
+    CITATION_MAPPING,
+    PERSIST_CONVERSATION,
+    END
+}

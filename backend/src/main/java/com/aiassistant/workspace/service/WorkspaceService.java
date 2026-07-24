@@ -59,6 +59,11 @@ public class WorkspaceService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Workspace Not Found", "Workspace was not found."));
     }
 
+    public Workspace requireExisting(Long id) {
+        return workspaces.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Workspace Not Found", "Workspace was not found."));
+    }
+
     private WorkspaceResponse toResponse(Workspace workspace) {
         return new WorkspaceResponse(workspace.getId(), workspace.getName(), workspace.getDescription(), workspace.getLanguage(),
                 workspace.getFramework(), workspace.getVisibility(), workspace.getCreatedAt(), workspace.getUpdatedAt());

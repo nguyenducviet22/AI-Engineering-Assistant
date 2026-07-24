@@ -4,6 +4,29 @@ server:
 spring:
   application:
     name: ai-engineering-assistant
+  ai:
+    model:
+      chat: openai
+    retry:
+      max-attempts: ${AI_MAX_RETRIES:2}
+    openai:
+      base-url: ${OPENROUTER_SPRING_BASE_URL:https://openrouter.ai/api}
+      api-key: ${OPENROUTER_API_KEY:}
+      chat:
+        options:
+          model: ${OPENROUTER_CHAT_MODEL:openai/gpt-4.1}
+          max-tokens: ${OPENROUTER_CHAT_MAX_TOKENS:1536}
+      embedding:
+        enabled: false
+      image:
+        enabled: false
+      moderation:
+        enabled: false
+      audio:
+        transcription:
+          enabled: false
+        speech:
+          enabled: false
   servlet:
     multipart:
       max-file-size: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:60MB}
@@ -38,7 +61,19 @@ app:
     enabled: ${INDEXING_ENABLED:true}
     async-enabled: ${INDEXING_ASYNC_ENABLED:true}
   ai:
+    prompt:
+      max-prompt-characters: ${AI_PROMPT_MAX_CHARACTERS:24000}
+      max-context-characters: ${AI_PROMPT_MAX_CONTEXT_CHARACTERS:14000}
+      max-history-characters: ${AI_PROMPT_MAX_HISTORY_CHARACTERS:6000}
+      max-history-messages: ${AI_PROMPT_MAX_HISTORY_MESSAGES:8}
     openrouter:
+      chat:
+        base-url: ${OPENROUTER_SPRING_BASE_URL:https://openrouter.ai/api}
+        api-key: ${OPENROUTER_API_KEY:}
+        model: ${OPENROUTER_CHAT_MODEL:openai/gpt-4.1}
+        max-tokens: ${OPENROUTER_CHAT_MAX_TOKENS:1536}
+        timeout: ${AI_REQUEST_TIMEOUT_SECONDS:30s}
+        max-retries: ${AI_MAX_RETRIES:2}
       enabled: ${OPENROUTER_EMBEDDING_ENABLED:true}
       base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
       api-key: ${OPENROUTER_API_KEY:}

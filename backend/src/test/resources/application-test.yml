@@ -1,4 +1,26 @@
 spring:
+  ai:
+    model:
+      chat: none
+    openai:
+      base-url: https://openrouter.ai/api
+      api-key: test-openrouter-key
+      chat:
+        enabled: false
+        options:
+          model: openai/gpt-4.1
+          max-tokens: 1536
+      embedding:
+        enabled: false
+      image:
+        enabled: false
+      moderation:
+        enabled: false
+      audio:
+        transcription:
+          enabled: false
+        speech:
+          enabled: false
   datasource:
     url: jdbc:h2:mem:aiassistant;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
     driver-class-name: org.h2.Driver
@@ -28,5 +50,17 @@ app:
     enabled: false
     async-enabled: true
   ai:
+    prompt:
+      max-prompt-characters: 24000
+      max-context-characters: 14000
+      max-history-characters: 6000
+      max-history-messages: 8
     openrouter:
+      chat:
+        base-url: https://openrouter.ai/api
+        api-key: test-openrouter-key
+        model: openai/gpt-4.1
+        max-tokens: 1536
+        timeout: 30s
+        max-retries: 2
       enabled: false

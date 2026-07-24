@@ -3,6 +3,8 @@ package com.aiassistant.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -13,6 +15,9 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final String GENERIC_ERROR_MESSAGE = "An unexpected error occurred.";
+
     public record ApiError(Instant timestamp, int status, String error, String message, String path) {}
 
     @ExceptionHandler(ApiException.class)
@@ -40,7 +45,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiError> fallback(Exception ex, HttpServletRequest request) {
+        log.error("Unhandled request failure at {}", request.getRequestURI(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ApiError(Instant.now(), 500, "Internal Server Error", ex.getMessage(), request.getRequestURI()));
+                .body(new ApiError(Instant.now(), 500, "Internal Server Error", GENERIC_ERROR_MESSAGE, request.getRequestURI()));
     }
 }
