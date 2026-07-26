@@ -8,8 +8,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CitationMappingNode implements RepositoryChatNode {
+    private static final Logger log = LoggerFactory.getLogger(CitationMappingNode.class);
     private static final Pattern BRACKETED_FILE_LINES = Pattern.compile("\\[([^\\[\\]:]+):(\\d+)-(\\d+)]");
     private static final Pattern BRACKETED_FILE_COMMA_LINES = Pattern.compile("\\[([^\\[\\]]+?),\\s*lines\\s+(\\d+)-(\\d+)]", Pattern.CASE_INSENSITIVE);
     private static final Pattern CHUNK_MARKER = Pattern.compile("\\[chunk:([^\\]]+)]");
@@ -23,7 +26,11 @@ public class CitationMappingNode implements RepositoryChatNode {
                 .distinct()
                 .toList();
         if (citations.isEmpty()) {
-            throw new IllegalStateException("Non-refusal repository answers require citations mapped from response spans.");
+            log.warn("LLM answer had no parseable citations; converting to safe refusal. workspaceId={} conversationId={} userMessage='{}' rawAnswer='{}'",
+                    state.workspaceId(), state.conversationId(), state.userMessage(), state.answer());
+            return state.withRefusal(RepositoryChatState.INSUFFICIENT_CONTEXT_MESSAGE)
+                    .withCitations(List.of())
+                    .mark(step());
         }
         return state.withCitations(citations).mark(step());
     }

@@ -83,6 +83,36 @@ class RepositoryChatWorkflowTests {
     }
 
     @Test
+    void uncitedLlmAnswerBecomesSafeRefusalInsteadOfThrowing() {
+        AtomicInteger llmCalls = new AtomicInteger();
+        RepositoryChatWorkflow workflow = workflow(
+                new RetrievalResult(List.of(
+                        chunk("history", "VNR202_SPST/agent.md", 34, 40, "Ho Chi Minh context", 0.45),
+                        chunk("timeline", "VNR202_SPST/agent.md", 87, 95, "Vietnam timeline", 0.39)
+                )),
+                prompt -> {
+                    llmCalls.incrementAndGet();
+                    return new LlmService.LlmResponse(
+                            "There is not enough repository data to answer accurately.",
+                            "openai/gpt-4.1",
+                            35);
+                });
+
+        RepositoryChatState result = workflow.run(7L, null, "Can you tell me more about Ho Chi Minh?", List.of());
+
+        assertThat(result.refused()).isTrue();
+        assertThat(result.answer()).isEqualTo(RepositoryChatState.INSUFFICIENT_CONTEXT_MESSAGE);
+        assertThat(result.citations()).isEmpty();
+        assertThat(result.llmResponse()).isNull();
+        assertThat(result.executionTrace()).contains(
+                WorkflowStep.LLM_GENERATION,
+                WorkflowStep.OUTPUT_VALIDATION,
+                WorkflowStep.CITATION_MAPPING,
+                WorkflowStep.PERSIST_CONVERSATION);
+        assertThat(llmCalls).hasValue(1);
+    }
+
+    @Test
     void followUpQuestionUsesPriorSuccessfulTurnForRetrievalQuery() {
         List<String> capturedQueries = new java.util.ArrayList<>();
         RepositoryRetrievalService retrievalService = query -> {

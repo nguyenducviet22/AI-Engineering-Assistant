@@ -2,6 +2,7 @@ package com.aiassistant.conversation;
 
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -85,6 +86,32 @@ class ConversationApiTests {
         mvc.perform(get("/api/v1/conversations/" + conversationId + "/messages")
                         .header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void uncitedLlmAnswerReturnsStandardRefusalInsteadOfServerError() throws Exception {
+        when(retrievalService.retrieve(any())).thenReturn(new RetrievalResult(List.of(
+                new RetrievedChunk("history", "VNR202_SPST/agent.md", 34, 40, "Ho Chi Minh context", "Historical context mentions Ho Chi Minh.", 0.45),
+                new RetrievedChunk("timeline", "VNR202_SPST/agent.md", 87, 95, "Vietnam timeline", "Related timeline content.", 0.39)
+        )));
+        when(llmService.generate(any(Prompt.class))).thenReturn(new LlmService.LlmResponse(
+                "There is not enough repository data to answer accurately.",
+                "openai/gpt-4.1",
+                35
+        ));
+        String ownerToken = register("uncited-answer-owner@example.com");
+        long workspaceId = createWorkspace(ownerToken);
+
+        mvc.perform(post("/api/v1/workspaces/" + workspaceId + "/chat")
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Can you tell me more about Ho Chi Minh?\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.answer", equalTo("I could not find sufficient repository context to answer that accurately.")))
+                .andExpect(jsonPath("$.refused", equalTo(true)))
+                .andExpect(jsonPath("$.citations", hasSize(0)))
+                .andExpect(jsonPath("$.model", nullValue()))
+                .andExpect(jsonPath("$.tokenUsage", nullValue()));
     }
 
     private String register(String email) throws Exception {

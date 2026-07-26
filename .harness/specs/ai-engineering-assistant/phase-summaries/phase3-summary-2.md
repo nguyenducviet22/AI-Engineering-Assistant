@@ -132,3 +132,38 @@
   - Created the local commit with the approved message.
 - Pending:
   - User will decide separately whether and when to push.
+
+## 2026-07-26 07:58:00 +07:00
+- Requested: investigate a manual-testing bug where an uncited non-refusal answer from the Ho Chi Minh question caused `CitationMappingNode` to throw a 500; report raw LLM output and root cause before implementing a fix.
+- Done:
+  - Re-read AGENTS.md, requirements.md, design.md, and hs-build instructions.
+  - Confirmed backend `8080` and Postgres `5432` were reachable.
+  - Identified workspace `7` as `Manual Test Workspace`, owner `manual-test@example.com`, with READY repository `8` (`VNR202_SPST.zip`) using a temporary repo-local DB inspection helper, then removed that helper.
+  - Reproduced the exact REST request `Can you tell me more about Ho Chi Minh?` against workspace `7` and confirmed it returns HTTP 500.
+  - Added a temporary diagnostic log after LLM generation, ran a separate backend on port `8089`, captured raw LLM output, then removed the diagnostic code.
+  - Diagnosed root cause: retrieval passed Context Validation with Ho Chi Minh-related chunks, the LLM returned its own uncited refusal text (`There is not enough repository data to answer accurately.`), and `CitationMappingNode` threw instead of converting this unsafe uncited output to the standard workflow refusal.
+- Pending:
+  - Await user approval before implementing the safe-refusal workflow fix and regression tests.
+  - Diagnostic backend on port `8089` remains listening under PID `11636`; stopping it from this shell returned access denied and no escalation was attempted.
+
+## 2026-07-26 08:08:00 +07:00
+- Requested: implement the approved safe-refusal fix for uncited LLM self-declines, add regression tests, run checks, re-run the Ho Chi Minh request, document the gap, and prepare a separate commit draft without committing.
+- Done:
+  - Confirmed port `8089` was cleaned up.
+  - Updated `CitationMappingNode` to convert non-refused answers with no parseable citations into the standard refusal response and log the raw uncited LLM output server-side.
+  - Updated `RepositoryChatState.withRefusal` to clear LLM metadata so citation-mapping refusals have the same client-facing shape as Context Validation refusals.
+  - Added workflow and API regression tests for retrieval-passes/LLM-no-citation behavior.
+  - Documented the root cause/fix in `plan-phase3.md` as a manual-testing-discovered gap distinct from the earlier citation-format mismatch.
+  - Ran focused tests and full `mvn -q test`; full Surefire summary reported `40` tests, `0` failures, `0` errors, `0` skipped.
+  - Started current code on port `8090` and confirmed the exact Ho Chi Minh request now returns `refused=true`, the standard refusal message, empty citations, `model=null`, and `tokenUsage=null`.
+- Pending:
+  - User approval before creating the new commit. Port `8090` remains listening under PID `17632`; stopping it from this shell returned access denied and no escalation was attempted.
+
+## 2026-07-26 08:12:00 +07:00
+- Requested: create the approved local commit for the uncited LLM repository answer safe-refusal fix without pushing.
+- Done:
+  - Appended this per-turn summary before staging so the working tree can be clean after commit.
+  - Staged the approved six changed files.
+  - Created the local commit with the approved message.
+- Pending:
+  - User will decide separately whether and when to push.

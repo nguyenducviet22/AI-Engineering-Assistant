@@ -91,7 +91,7 @@ public record RepositoryChatState(
 
     public RepositoryChatState withRefusal(String refusalAnswer) {
         return new RepositoryChatState(workspaceId, conversationId, assistantMessageId, userMessage, intent, retrievalResult, false,
-                true, refusalAnswer, prompt, llmResponse, List.of(), conversationHistory, retrievalContext, retrievalQuery, executionTrace);
+                true, refusalAnswer, prompt, null, List.of(), conversationHistory, retrievalContext, retrievalQuery, executionTrace);
     }
 
     public RepositoryChatState withPrompt(Prompt value) {
