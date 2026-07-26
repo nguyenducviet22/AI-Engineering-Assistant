@@ -204,3 +204,13 @@
   - Appended this log entry so the per-turn summary is included in the pending docs commit before push.
 - Pending:
   - Commit the Phase 3 summary log, confirm clean status, push, and report push output/status.
+
+## 2026-07-26 09:11:11 +07:00
+
+- Requested: update Phase 2 and Phase 3 information in `README.md` and push it to GitHub.
+- Done:
+  - Added README sections for Phase 2 repository processing, async indexing lifecycle, retry endpoint, pgvector/OpenRouter embeddings, and MVP indexing limitation.
+  - Added README section for Phase 3 repository chat, conversation endpoints, chat request/response shape, newest-READY repository scoping, and OpenRouter/Spring AI runtime variables.
+  - Kept the update documentation-only; no backend/frontend code changed.
+- Pending:
+  - Commit README plus this required phase summary entry and push to `origin/main`.

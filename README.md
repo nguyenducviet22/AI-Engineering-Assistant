@@ -122,3 +122,84 @@ created by Flyway migration `V2__repository_processing.sql`.
 Repository uploads accept ZIP files only. Phase 1 validates and stores upload
 metadata, creates immutable version records, and exposes an `INDEXING` boundary
 for Phase 2 parser/chunk/embedding work.
+
+## Phase 2 Repository Processing
+
+Phase 2 turns uploaded ZIP repositories into searchable repository knowledge:
+
+- extracts supported source/config/docs files from the stored repository ZIP
+- ignores generated, dependency, binary, media, archive, and unsafe paths
+- chunks Java, TypeScript, JavaScript, SQL, Markdown, YAML, JSON, and XML into semantic or logical blocks
+- stores source file and chunk metadata, including workspace, repository, version, file path, symbol, and line ranges
+- generates OpenRouter embeddings with `openai/text-embedding-3-small`
+- stores 1536-dimensional embeddings in PostgreSQL pgvector
+
+Indexing is asynchronous after upload. Repository status follows:
+
+```text
+UPLOADING -> VALIDATING -> INDEXING -> READY
+                                  \-> FAILED
+```
+
+Additional Phase 2 endpoint:
+
+- `POST /api/v1/repositories/{id}/retry-indexing`
+
+Use `GET /api/v1/repositories/{id}/status` to poll indexing progress. If a
+repository is `FAILED`, the retry endpoint clears partial rows for that
+repository version and runs indexing again.
+
+Current MVP note: indexing uses an in-memory async worker and a transaction
+around the indexing loop. Interrupted work is recoverable through repository
+status and retry, but progress is not visible chunk-by-chunk until commit.
+
+## Phase 3 Repository Chat
+
+Phase 3 adds repository-aware chat on top of the Phase 2 pgvector index.
+Every chat request retrieves repository context before generation. If retrieved
+context is not strong enough, or if the model returns an uncited answer, the
+API returns a safe refusal instead of fabricating repository details.
+
+Conversation endpoints:
+
+- `GET /api/v1/workspaces/{id}/conversations`
+- `POST /api/v1/workspaces/{id}/chat`
+- `GET /api/v1/conversations/{id}/messages`
+
+`POST /api/v1/workspaces/{id}/chat` accepts:
+
+```json
+{
+  "conversationId": 1,
+  "message": "How does JwtAuthenticationFilter authenticate a request?"
+}
+```
+
+`conversationId` is optional. Omit it to start a new conversation.
+
+The chat response includes the conversation id, assistant message id, answer,
+citations, refusal flag, model, and token usage when generation runs. Citations
+map back to chunk id, file path, and line range.
+
+Phase 3 retrieval is scoped to the most recently created `READY` repository in
+the workspace and that repository's current version. A repository selector is a
+future improvement; for now, one workspace chat targets one active repository at
+a time.
+
+OpenRouter/Spring AI runtime configuration:
+
+```text
+OPENROUTER_API_KEY
+OPENROUTER_CHAT_MODEL=openai/gpt-4.1
+OPENROUTER_CHAT_MAX_TOKENS=1536
+OPENROUTER_SPRING_BASE_URL=https://openrouter.ai/api
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_EMBEDDING_MODEL=openai/text-embedding-3-small
+AI_REQUEST_TIMEOUT_SECONDS
+AI_MAX_RETRIES
+```
+
+`OPENROUTER_SPRING_BASE_URL` is used by Spring AI chat and intentionally omits
+the trailing `/v1`. `OPENROUTER_BASE_URL` is used by the existing custom Phase 2
+embedding client and includes `/api/v1` because that client posts directly to
+`/embeddings`.
