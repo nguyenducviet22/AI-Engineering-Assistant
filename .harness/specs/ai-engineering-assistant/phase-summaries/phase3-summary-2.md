@@ -182,3 +182,25 @@
 - Pending:
   - This fix is uncommitted and should become a separate commit after review/approval.
   - Backend process on port 8091 could not be stopped from the current shell due Windows `Access is denied`; user may need to stop it locally.
+
+## 2026-07-26 08:43:40 +07:00
+
+- Requested: create the approved `fix: sanitize embedding provider failures` commit, do not push, confirm log/status, then restart backend with restored real key and rerun the full Postman collection requests 1-12.
+- Done:
+  - Created local commit `776c5d5 fix: sanitize embedding provider failures` with the exact approved subject/body.
+  - Confirmed `git log --oneline -5` shows the five Phase 3 commits in order and `git status --short` was clean immediately after the commit.
+  - Confirmed `OPENROUTER_API_KEY` is present using a non-revealing `PRESENT length=73` check.
+  - Searched for Postman/Newman collection files and Postman-related directories in the workspace; none were present.
+  - Checked for `newman` in PATH; it was not available.
+- Pending:
+  - Full Postman request 1-12 rerun is blocked until the collection is exported/provided or the exact 12 requests are listed.
+  - This required per-turn summary append is now an uncommitted working-tree change after the approved commit.
+
+## 2026-07-26 08:52:05 +07:00
+
+- Requested: manual Postman testing is confirmed externally passing; commit the pending Phase 3 summary log if dirty, then push the Phase 3 commits to the tracking branch without force-push.
+- Done:
+  - Confirmed branch `main` was ahead of `origin/main` by 5 commits and only `phase3-summary-2.md` was modified.
+  - Appended this log entry so the per-turn summary is included in the pending docs commit before push.
+- Pending:
+  - Commit the Phase 3 summary log, confirm clean status, push, and report push output/status.
