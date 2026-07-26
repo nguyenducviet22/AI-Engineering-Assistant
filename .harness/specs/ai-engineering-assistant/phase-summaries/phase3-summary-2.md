@@ -167,3 +167,18 @@
   - Created the local commit with the approved message.
 - Pending:
   - User will decide separately whether and when to push.
+## 2026-07-26 08:35:58 +07:00
+
+- Requested: fix manual-testing bug where invalid `OPENROUTER_API_KEY` caused the embedding/retrieval path to return raw provider details in the `/chat` 503 response.
+- Done:
+  - Found the leak in `OpenRouterEmbeddingClient`, which constructed `Embedding Service Unavailable` responses with raw provider/HTTP details from failed embedding requests.
+  - Added shared `AiProviderFailureTranslator` and reused it from both `SpringAiLlmService` and `OpenRouterEmbeddingClient`.
+  - Updated embedding failures to return safe `503 AI Provider Unavailable` with message `The assistant is temporarily unavailable, please try again.` while logging raw details server-side.
+  - Added `OpenRouterEmbeddingClientTests` for raw 401 sanitization and extended provider-failure API tests for the retrieval/embedding failure envelope.
+  - Searched main source for remaining direct HTTP/provider paths; only chat and embedding provider paths were found.
+  - Updated `plan-phase3.md` with the manual-testing-discovered embedding provider leakage fix.
+  - Ran targeted tests and full `mvn -q test`; full Surefire total was 42 tests, 0 failures, 0 errors, 0 skipped.
+  - Started backend on port 8091 with the intentionally broken key and confirmed the real `/api/v1/workspaces/7/chat` response is the safe standard 503 JSON.
+- Pending:
+  - This fix is uncommitted and should become a separate commit after review/approval.
+  - Backend process on port 8091 could not be stopped from the current shell due Windows `Access is denied`; user may need to stop it locally.

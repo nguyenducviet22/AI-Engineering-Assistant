@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 @Service
 public class SpringAiLlmService implements LlmService {
     private static final Logger log = LoggerFactory.getLogger(SpringAiLlmService.class);
-    private static final String SAFE_PROVIDER_MESSAGE = "The assistant is temporarily unavailable, please try again.";
 
     private final ObjectProvider<ChatModel> chatModelProvider;
     private final OpenRouterChatProperties properties;
@@ -37,7 +36,7 @@ public class SpringAiLlmService implements LlmService {
         try {
             response = chatModel.call(prompt);
         } catch (RuntimeException ex) {
-            throw translateProviderFailure(ex);
+            throw AiProviderFailureTranslator.unavailable("chat", ex, log);
         }
         String content = response.getResult().getOutput().getText();
         String model = response.getMetadata() == null || response.getMetadata().getModel() == null
@@ -48,48 +47,4 @@ public class SpringAiLlmService implements LlmService {
         return new LlmResponse(content, model, tokenUsage);
     }
 
-    private ApiException translateProviderFailure(RuntimeException ex) {
-        ProviderFailureCategory category = categorize(ex);
-        log.warn("OpenRouter chat request failed: category={}", category, ex);
-        return new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "AI Provider Unavailable", SAFE_PROVIDER_MESSAGE);
-    }
-
-    private ProviderFailureCategory categorize(Throwable ex) {
-        String message = flattenMessages(ex).toLowerCase();
-        if (message.contains("401") || message.contains("403") || message.contains("unauthorized")
-                || message.contains("forbidden") || message.contains("invalid api key") || message.contains("authentication")) {
-            return ProviderFailureCategory.AUTHENTICATION;
-        }
-        if (message.contains("429") || message.contains("rate limit") || message.contains("too many requests")) {
-            return ProviderFailureCategory.RATE_LIMIT;
-        }
-        if (message.contains("timeout") || message.contains("timed out") || message.contains("read timed")) {
-            return ProviderFailureCategory.TIMEOUT;
-        }
-        if (message.contains("402") || message.contains("insufficient credit") || message.contains("insufficient balance")
-                || message.contains("credits")) {
-            return ProviderFailureCategory.INSUFFICIENT_CREDITS;
-        }
-        return ProviderFailureCategory.PROVIDER_ERROR;
-    }
-
-    private String flattenMessages(Throwable ex) {
-        StringBuilder builder = new StringBuilder();
-        Throwable current = ex;
-        while (current != null) {
-            if (current.getMessage() != null) {
-                builder.append(current.getMessage()).append(' ');
-            }
-            current = current.getCause();
-        }
-        return builder.toString();
-    }
-
-    private enum ProviderFailureCategory {
-        AUTHENTICATION,
-        RATE_LIMIT,
-        TIMEOUT,
-        INSUFFICIENT_CREDITS,
-        PROVIDER_ERROR
-    }
 }

@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -12,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.aiassistant.retrieval.RetrievalResult;
 import com.aiassistant.retrieval.RetrievedChunk;
+import com.aiassistant.exception.ApiException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -22,6 +24,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -64,6 +67,32 @@ class SpringAiProviderFailureApiTests {
                 .andExpect(jsonPath("$.message", not(containsString("raw-provider-body"))))
                 .andExpect(jsonPath("$.message", not(containsString("invalid_api_key"))))
                 .andExpect(jsonPath("$.message", not(containsString("sk-test-do-not-return"))));
+    }
+
+    @Test
+    void embeddingProviderFailureReturnsSafeUnavailableResponseWithoutRawProviderBody() throws Exception {
+        when(retrievalService.retrieve(any())).thenThrow(new ApiException(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "AI Provider Unavailable",
+                "The assistant is temporarily unavailable, please try again."));
+
+        String token = register("embedding-provider-failure-owner@example.com");
+        long workspaceId = createWorkspace(token);
+
+        mvc.perform(post("/api/v1/workspaces/" + workspaceId + "/chat")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"How does JwtAuthenticationFilter authenticate a request?\"}"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.timestamp", notNullValue()))
+                .andExpect(jsonPath("$.status", equalTo(503)))
+                .andExpect(jsonPath("$.error", equalTo("AI Provider Unavailable")))
+                .andExpect(jsonPath("$.message", equalTo("The assistant is temporarily unavailable, please try again.")))
+                .andExpect(jsonPath("$.path", equalTo("/api/v1/workspaces/" + workspaceId + "/chat")))
+                .andExpect(jsonPath("$.message", not(containsString("OpenRouter"))))
+                .andExpect(jsonPath("$.message", not(containsString("401"))))
+                .andExpect(jsonPath("$.message", not(containsString("Unauthorized"))));
+        verifyNoInteractions(chatModel);
     }
 
     private String register(String email) throws Exception {

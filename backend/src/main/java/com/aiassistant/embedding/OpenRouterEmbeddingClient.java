@@ -1,20 +1,27 @@
 package com.aiassistant.embedding;
 
+import com.aiassistant.ai.AiProviderFailureTranslator;
 import com.aiassistant.exception.ApiException;
 import java.util.List;
 import org.springframework.boot.web.client.ClientHttpRequestFactories;
 import org.springframework.boot.web.client.ClientHttpRequestFactorySettings;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 @Service
 public class OpenRouterEmbeddingClient implements EmbeddingClient {
+    private static final Logger log = LoggerFactory.getLogger(OpenRouterEmbeddingClient.class);
+
     private final OpenRouterEmbeddingProperties properties;
     private final RestClient restClient;
 
+    @Autowired
     public OpenRouterEmbeddingClient(OpenRouterEmbeddingProperties properties, RestClient.Builder builder) {
         this.properties = properties;
         ClientHttpRequestFactorySettings settings = ClientHttpRequestFactorySettings.DEFAULTS
@@ -24,6 +31,11 @@ public class OpenRouterEmbeddingClient implements EmbeddingClient {
                 .baseUrl(properties.resolvedBaseUrl())
                 .requestFactory(ClientHttpRequestFactories.get(settings))
                 .build();
+    }
+
+    OpenRouterEmbeddingClient(OpenRouterEmbeddingProperties properties, RestClient restClient) {
+        this.properties = properties;
+        this.restClient = restClient;
     }
 
     @Override
@@ -57,11 +69,12 @@ public class OpenRouterEmbeddingClient implements EmbeddingClient {
                 last = ex;
             }
         }
-        throw providerError("OpenRouter embedding request failed: " + (last == null ? "unknown error" : last.getMessage()));
+        throw AiProviderFailureTranslator.unavailable("embedding", last == null ? new IllegalStateException("unknown embedding provider error") : last, log);
     }
 
     private ApiException providerError(String message) {
-        return new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "Embedding Service Unavailable", message);
+        log.warn("AI provider request failed: component=embedding, detail={}", message);
+        return new ApiException(HttpStatus.SERVICE_UNAVAILABLE, AiProviderFailureTranslator.SAFE_ERROR, AiProviderFailureTranslator.SAFE_MESSAGE);
     }
 
     private record EmbeddingRequest(String model, String input) {
