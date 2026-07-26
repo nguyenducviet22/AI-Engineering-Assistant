@@ -55,3 +55,80 @@
   - Appended this entry before staging the chore commit so per-turn logging remains part of the approved local dev/planning commit.
 - Pending approval:
   - Complete the second approved chore commit, then report `git log --oneline -2` and clean `git status`.
+
+## 2026-07-24 16:27:51 +07:00
+- Requested: diagnose Spring Boot startup failure caused by port `8080` already being in use.
+- Done:
+  - Tried `Get-NetTCPConnection -LocalPort 8080 -State Listen`; Windows denied access.
+  - Ran `netstat -ano | Select-String ':8080'`; no current listener was reported.
+  - Listed Java processes and found several Java/JDK processes running.
+  - Tried reading Java command lines via CIM to identify the backend process; Windows denied access.
+  - Did not request elevated/admin privileges, consistent with the user's earlier instruction not to self-escalate.
+- Pending:
+  - User may need to stop the old backend process manually if port `8080` is still occupied locally, or run the app on another port.
+
+## 2026-07-24 16:39:34 +07:00
+- Requested: investigate why a vague follow-up question in an existing conversation was refused despite a prior cited answer.
+- Done:
+  - Read AGENTS.md and checked the locked spec/design references for multi-turn conversation and retrieval behavior.
+  - Inspected `RepositoryChatService`, `RepositoryChatWorkflow`, `RepositoryChatState`, `RetrieveContextNode`, `PgvectorRepositoryRetrievalService`, `PromptSelectionNode`, `PromptBuilder`, and `ConversationService`.
+  - Confirmed retrieval currently embeds only the current user message via `state.userMessage()` / `query.question()`.
+  - Confirmed conversation history is available in workflow state but is only consumed later by `PromptSelectionNode`/`PromptBuilder`, after Context Validation has already accepted or refused the retrieved context.
+  - Diagnosed the refused follow-up as a real Phase 3 multi-turn retrieval gap against FR-021.
+- Pending:
+  - User decision whether to fix now with query condensation/history-aware retrieval, or document as a known MVP limitation.
+
+## 2026-07-24 17:17:31 +07:00
+- Requested: implement approved rule-based always-concatenate query condensation for multi-turn follow-ups, test it, recalibrate, and prepare a new post-commit fix without amending existing commits.
+- Done:
+  - Added `QueryCondensationService` and `ConversationRetrievalContext`.
+  - Updated workflow/state/retrieval node so retrieval embeds a condensed query when a prior successful non-refused turn exists.
+  - Updated `ConversationService` to find the most recent successful user/assistant pair and skip refused turns.
+  - Added regression tests for vague JWT follow-up retrieval, first-message no-op behavior, skipped refused turns, and conversations with only refused turns.
+  - Updated `plan-phase3.md` with the manual pre-push multi-turn retrieval fix and future multi-turn verify checklist item.
+  - Ran targeted tests successfully, then `mvn -q test`; after removing a stale temporary calibration helper class from `target/test-classes`, Surefire reported `tests=34 failures=0 errors=0 skipped=0`.
+  - Started backend build on port `8087`, uploaded a real backend source ZIP through the API, waited for repository `7` in workspace `6` to become READY after 392s, and verified the JWT question followed by `Can you explain that in more detail?` returned `refused=false` with citations.
+  - Ran temporary calibration against real OpenRouter embeddings/pgvector and deleted the helper source afterward.
+- Pending:
+  - Calibration revealed that always-concatenated unrelated follow-ups also score above current Context Validation thresholds because the prior successful JWT context dominates the query; user decision needed before committing or further fixing.
+
+## 2026-07-26 06:41:23 +07:00
+- Requested: do not implement another fix yet; evaluate concrete design options for the multi-turn context-bleed regression using calibration data and document the finding.
+- Done:
+  - Re-read AGENTS.md instructions supplied in the prompt plus locked `requirements.md` and `design.md`.
+  - Added a `plan-phase3.md` deviation note documenting the always-concat context-bleed/false-positive risk.
+  - Created and ran a temporary calibration check against real OpenRouter embeddings and pgvector for raw current-message retrieval, full concat, prior-question-only, and prior-question-plus-citations strategies.
+  - Extracted complete score output from Surefire reports because tool stdout was truncated.
+  - Deleted the temporary calibration helper source after collecting evidence.
+- Pending:
+  - User decision on which design option to implement before creating the post-commit fix commit.
+
+## 2026-07-26 06:58:00 +07:00
+- Requested: add short follow-up and adversarial calibration evidence, then implement the approved guarded D+A query-condensation approach if the data supported it.
+- Done:
+  - Documented the final calibration evidence in `plan-phase3.md`, including why the always-concat/weighted-context variants were rejected and the residual MVP ambiguity risk for vague anaphora.
+  - Implemented raw-first retrieval with guarded condensation: retry with prior successful context only when raw retrieval fails, a prior non-refused successful turn exists, the message looks follow-up-like, and raw top score is at least `0.20`.
+  - Added regression coverage for the failed JWT follow-up, short follow-ups (`why?`, `go on`, `and then?`), no-history no-op behavior, refused-turn skipping, raw-pass no-condensation behavior, and explicit unrelated follow-up refusal.
+  - Ran focused workflow/conversation tests successfully and full `mvn -q test`; Surefire summary reported `38` tests, `0` failures, `0` errors, `0` skipped.
+  - Started a fresh backend on port `8088` and verified via real API that the JWT question followed by `Can you explain that in more detail?` returns `refused=false` with citations; an explicit unrelated follow-up about the capital of France refuses with empty citations and `model=null`.
+- Pending:
+  - The Java process on port `8088` could not be stopped from the current shell due access denied; no escalation was attempted. User approval is still needed before committing this post-commit fix.
+
+## 2026-07-26 07:08:00 +07:00
+- Requested: confirm port `8088` cleanup, prepare the approved guarded multi-turn fix as a separate new commit, show status/diff stat, draft the commit message, and rerun final tests without committing.
+- Done:
+  - Re-read `hs-ship` instructions for commit-prep behavior.
+  - Confirmed `netstat` finds no listener on port `8088`; `Test-NetConnection` timed out after reporting failed IPv6/IPv4 connects, consistent with no reachable process.
+  - Ran final `mvn -q test`; Surefire summary reported `38` tests, `0` failures, `0` errors, `0` skipped.
+  - Collected current `git status --short` and `git diff --stat` for the uncommitted post-commit fix.
+- Pending:
+  - Waiting for explicit user approval before creating the new fix commit.
+
+## 2026-07-26 07:12:00 +07:00
+- Requested: create the approved local fix commit for guarded multi-turn query condensation without pushing.
+- Done:
+  - Appended this per-turn summary before staging so the working tree can be clean after commit.
+  - Staged the approved modified files plus `QueryCondensationService.java` and `ConversationRetrievalContext.java`.
+  - Created the local commit with the approved message.
+- Pending:
+  - User will decide separately whether and when to push.

@@ -6,12 +6,15 @@ import com.aiassistant.ai.LlmService;
 import com.aiassistant.ai.PromptBuilder;
 import com.aiassistant.ai.PromptProperties;
 import com.aiassistant.ai.PromptTemplateService;
+import com.aiassistant.conversation.service.ConversationRetrievalContext;
 import com.aiassistant.retrieval.Citation;
 import com.aiassistant.retrieval.RepositoryRetrievalService;
 import com.aiassistant.retrieval.RetrievalResult;
 import com.aiassistant.retrieval.RetrievedChunk;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class RepositoryChatWorkflowTests {
@@ -77,6 +80,180 @@ class RepositoryChatWorkflowTests {
         assertThat(result.citations()).isEmpty();
         assertThat(result.prompt()).isNull();
         assertThat(llmCalls).hasValue(0);
+    }
+
+    @Test
+    void followUpQuestionUsesPriorSuccessfulTurnForRetrievalQuery() {
+        List<String> capturedQueries = new java.util.ArrayList<>();
+        RepositoryRetrievalService retrievalService = query -> {
+            capturedQueries.add(query.question());
+            if (query.question().contains("JwtAuthenticationFilter") && query.question().contains("Can you explain that in more detail?")) {
+                return new RetrievalResult(List.of(
+                        chunk("jwt-filter", "JwtAuthenticationFilter.java", 15, 41, "JwtAuthenticationFilter.doFilterInternal", 0.42),
+                        chunk("jwt-util", "JwtUtil.java", 10, 30, "JwtUtil.validateToken", 0.32),
+                        chunk("security", "SecurityConfig.java", 20, 45, "SecurityConfig", 0.27)
+                ));
+            }
+            return new RetrievalResult(List.of(chunk("weak-follow-up", "README.md", 1, 4, "README", 0.25)));
+        };
+        RepositoryChatWorkflow workflow = workflow(
+                retrievalService,
+                prompt -> new LlmService.LlmResponse(
+                        "The filter reads a Bearer token, validates it, and sets authentication. [JwtAuthenticationFilter.java:15-41]",
+                        "test-model",
+                        80));
+
+        RepositoryChatState result = workflow.run(
+                7L,
+                11L,
+                "Can you explain that in more detail?",
+                List.of(
+                        new PromptBuilder.ConversationTurn("USER", "How does JwtAuthenticationFilter authenticate a request?"),
+                        new PromptBuilder.ConversationTurn("ASSISTANT", "It validates the bearer token.")
+                ),
+                Optional.of(new ConversationRetrievalContext(
+                        "How does JwtAuthenticationFilter authenticate a request?",
+                        "It reads the Authorization header and validates the JWT before setting authentication.",
+                        List.of(new Citation("jwt-filter", "JwtAuthenticationFilter.java", 15, 41))
+                ))
+        );
+
+        assertThat(capturedQueries).hasSize(2);
+        assertThat(capturedQueries.get(0)).isEqualTo("Can you explain that in more detail?");
+        assertThat(capturedQueries.get(1))
+                .contains("Previous successful user question:")
+                .contains("How does JwtAuthenticationFilter authenticate a request?")
+                .contains("Previous successful assistant answer:")
+                .contains("JwtAuthenticationFilter.java:15-41")
+                .contains("Current user message:")
+                .contains("Can you explain that in more detail?");
+        assertThat(result.refused()).isFalse();
+        assertThat(result.citations()).singleElement().satisfies(citation -> {
+            assertThat(citation.chunkId()).isEqualTo("jwt-filter");
+            assertThat(citation.filePath()).isEqualTo("JwtAuthenticationFilter.java");
+        });
+    }
+
+    @Test
+    void veryShortFollowUpCanUseCondensedRetrievalWhenRawScoreIsInFollowUpBand() {
+        List<String> capturedQueries = new java.util.ArrayList<>();
+        RepositoryRetrievalService retrievalService = query -> {
+            capturedQueries.add(query.question());
+            if (query.question().contains("JwtAuthenticationFilter") && query.question().contains("why?")) {
+                return new RetrievalResult(List.of(
+                        chunk("jwt-filter", "JwtAuthenticationFilter.java", 15, 41, "JwtAuthenticationFilter.doFilterInternal", 0.50)
+                ));
+            }
+            return new RetrievalResult(List.of(chunk("weak-short-follow-up", "README.md", 1, 4, "README", 0.24)));
+        };
+        RepositoryChatWorkflow workflow = workflow(
+                retrievalService,
+                prompt -> new LlmService.LlmResponse(
+                        "The filter authenticates only when the token is valid. [JwtAuthenticationFilter.java:15-41]",
+                        "test-model",
+                        80));
+
+        RepositoryChatState result = workflow.run(
+                7L,
+                11L,
+                "why?",
+                List.of(),
+                Optional.of(jwtRetrievalContext())
+        );
+
+        assertThat(capturedQueries).hasSize(2);
+        assertThat(capturedQueries.get(0)).isEqualTo("why?");
+        assertThat(capturedQueries.get(1)).contains("JwtAuthenticationFilter").contains("why?");
+        assertThat(result.refused()).isFalse();
+        assertThat(result.citations()).singleElement().satisfies(citation ->
+                assertThat(citation.filePath()).isEqualTo("JwtAuthenticationFilter.java"));
+    }
+
+    @Test
+    void unrelatedFollowUpPhraseWithVeryLowRawScoreDoesNotUseCondensedRetrieval() {
+        AtomicInteger llmCalls = new AtomicInteger();
+        List<String> capturedQueries = new java.util.ArrayList<>();
+        RepositoryRetrievalService retrievalService = query -> {
+            capturedQueries.add(query.question());
+            return new RetrievalResult(List.of(chunk("unrelated", "README.md", 1, 4, "README", 0.12)));
+        };
+        RepositoryChatWorkflow workflow = workflow(
+                retrievalService,
+                prompt -> {
+                    llmCalls.incrementAndGet();
+                    return new LlmService.LlmResponse("This must not be called.", "test-model", 1);
+                });
+
+        RepositoryChatState result = workflow.run(
+                7L,
+                11L,
+                "Can you explain that in more detail about the capital of France?",
+                List.of(),
+                Optional.of(jwtRetrievalContext())
+        );
+
+        assertThat(capturedQueries).containsExactly("Can you explain that in more detail about the capital of France?");
+        assertThat(result.refused()).isTrue();
+        assertThat(llmCalls).hasValue(0);
+    }
+
+    @Test
+    void standaloneQuestionThatPassesRawRetrievalDoesNotUseCondensationEvenWithHistory() {
+        List<String> capturedQueries = new java.util.ArrayList<>();
+        RepositoryRetrievalService retrievalService = query -> {
+            capturedQueries.add(query.question());
+            return new RetrievalResult(List.of(
+                    chunk("auth", "AuthService.java", 10, 40, "AuthService.login", 0.50)
+            ));
+        };
+        RepositoryChatWorkflow workflow = workflow(
+                retrievalService,
+                prompt -> new LlmService.LlmResponse("Login checks credentials. [AuthService.java:10-40]", "test-model", 34));
+
+        RepositoryChatState result = workflow.run(
+                7L,
+                11L,
+                "What does AuthService.login check before issuing a token?",
+                List.of(),
+                Optional.of(jwtRetrievalContext())
+        );
+
+        assertThat(capturedQueries).containsExactly("What does AuthService.login check before issuing a token?");
+        assertThat(result.refused()).isFalse();
+    }
+
+    @Test
+    void firstMessageRetrievalQueryIsUnchangedWhenNoConversationContextExists() {
+        AtomicReference<String> capturedQuery = new AtomicReference<>();
+        RepositoryRetrievalService retrievalService = query -> {
+            capturedQuery.set(query.question());
+            return new RetrievalResult(List.of(
+                    chunk("auth", "AuthService.java", 10, 40, "AuthService.login", 0.50)
+            ));
+        };
+        RepositoryChatWorkflow workflow = workflow(
+                retrievalService,
+                prompt -> new LlmService.LlmResponse("Login checks credentials. [AuthService.java:10-40]", "test-model", 34));
+
+        RepositoryChatState result = workflow.run(7L, null, "What does AuthService.login check?", List.of());
+
+        assertThat(capturedQuery.get()).isEqualTo("What does AuthService.login check?");
+        assertThat(result.refused()).isFalse();
+    }
+
+    @Test
+    void queryCondensationGateRequiresHistoryFollowUpShapeAndRawScoreFloor() {
+        QueryCondensationService service = new QueryCondensationService();
+        Optional<ConversationRetrievalContext> prior = Optional.of(jwtRetrievalContext());
+
+        assertThat(service.shouldAttemptCondensation("why?", rawResult(0.24), prior)).isTrue();
+        assertThat(service.shouldAttemptCondensation("go on", rawResult(0.23), prior)).isTrue();
+        assertThat(service.shouldAttemptCondensation("and then?", rawResult(0.26), prior)).isTrue();
+        assertThat(service.shouldAttemptCondensation("Can you explain that in more detail?", rawResult(0.25), prior)).isTrue();
+        assertThat(service.shouldAttemptCondensation("Can you explain that in more detail about the capital of France?", rawResult(0.12), prior))
+                .isFalse();
+        assertThat(service.shouldAttemptCondensation("What does AuthService.login check?", rawResult(0.25), prior)).isFalse();
+        assertThat(service.shouldAttemptCondensation("why?", rawResult(0.24), Optional.empty())).isFalse();
     }
 
     @Test
@@ -226,10 +403,13 @@ class RepositoryChatWorkflowTests {
     }
 
     private RepositoryChatWorkflow workflow(RetrievalResult retrievalResult, LlmService llmService) {
+        return workflow(query -> retrievalResult, llmService);
+    }
+
+    private RepositoryChatWorkflow workflow(RepositoryRetrievalService retrievalService, LlmService llmService) {
         PromptBuilder promptBuilder = new PromptBuilder(
                 new PromptTemplateService(),
                 new PromptProperties(24000, 14000, 6000, 8));
-        RepositoryRetrievalService retrievalService = query -> retrievalResult;
         return new RepositoryChatWorkflow(
                 new IntentDetectionNode(),
                 new RetrieveContextNode(retrievalService),
@@ -244,5 +424,17 @@ class RepositoryChatWorkflowTests {
 
     private RetrievedChunk chunk(String id, String file, int startLine, int endLine, String symbol, double score) {
         return new RetrievedChunk(id, file, startLine, endLine, symbol, "content for " + symbol, score);
+    }
+
+    private RetrievalResult rawResult(double score) {
+        return new RetrievalResult(List.of(chunk("raw", "README.md", 1, 4, "README", score)));
+    }
+
+    private ConversationRetrievalContext jwtRetrievalContext() {
+        return new ConversationRetrievalContext(
+                "How does JwtAuthenticationFilter authenticate a request?",
+                "It reads the Authorization header and validates the JWT before setting authentication.",
+                List.of(new Citation("jwt-filter", "JwtAuthenticationFilter.java", 15, 41))
+        );
     }
 }

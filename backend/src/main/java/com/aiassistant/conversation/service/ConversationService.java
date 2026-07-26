@@ -17,6 +17,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,6 +75,30 @@ public class ConversationService implements ConversationPersistencePort {
                 .filter(message -> message.getRole() == MessageRole.USER || message.getRole() == MessageRole.ASSISTANT)
                 .map(message -> new ConversationTurn(message.getRole().name(), message.getContent()))
                 .toList();
+    }
+
+    public Optional<ConversationRetrievalContext> lastSuccessfulTurnForRetrieval(Long ownerId, Long conversationId) {
+        if (conversationId == null) {
+            return Optional.empty();
+        }
+        requireOwnedConversation(ownerId, conversationId);
+        List<ConversationMessage> orderedMessages = messages.findAllByConversationIdOrderByCreatedAtAsc(conversationId);
+        ConversationMessage pendingUser = null;
+        ConversationRetrievalContext lastSuccessfulTurn = null;
+        for (ConversationMessage message : orderedMessages) {
+            if (message.getRole() == MessageRole.USER) {
+                pendingUser = message;
+                continue;
+            }
+            if (message.getRole() == MessageRole.ASSISTANT && pendingUser != null && isSuccessfulAssistantTurn(message)) {
+                lastSuccessfulTurn = new ConversationRetrievalContext(
+                        pendingUser.getContent(),
+                        message.getContent(),
+                        readCitations(message.getCitationsJson())
+                );
+            }
+        }
+        return Optional.ofNullable(lastSuccessfulTurn);
     }
 
     public Conversation requireOwnedConversation(Long ownerId, Long conversationId, Long workspaceId) {
@@ -143,6 +168,13 @@ public class ConversationService implements ConversationPersistencePort {
         } catch (JsonProcessingException ex) {
             throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Conversation Persistence Failed", "Unable to serialize conversation metadata.");
         }
+    }
+
+    private boolean isSuccessfulAssistantTurn(ConversationMessage message) {
+        return message.getModel() != null
+                && message.getContent() != null
+                && !message.getContent().isBlank()
+                && !RepositoryChatState.INSUFFICIENT_CONTEXT_MESSAGE.equals(message.getContent());
     }
 
     private List<com.aiassistant.retrieval.Citation> readCitations(String value) {

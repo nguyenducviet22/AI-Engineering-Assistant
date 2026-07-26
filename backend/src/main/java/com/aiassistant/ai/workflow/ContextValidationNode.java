@@ -11,10 +11,7 @@ public class ContextValidationNode implements RepositoryChatNode {
 
     @Override
     public RepositoryChatState apply(RepositoryChatState state) {
-        List<RetrievedChunk> chunks = state.retrievalResult().chunks().stream()
-                .sorted(Comparator.comparingDouble(RetrievedChunk::score).reversed())
-                .toList();
-        boolean valid = isGoodEnough(chunks);
+        boolean valid = isGoodEnough(state.retrievalResult().chunks());
         RepositoryChatState next = state.withContextValidation(valid);
         if (!valid) {
             next = next.withRefusal(RepositoryChatState.INSUFFICIENT_CONTEXT_MESSAGE);
@@ -22,19 +19,22 @@ public class ContextValidationNode implements RepositoryChatNode {
         return next.mark(step());
     }
 
-    private boolean isGoodEnough(List<RetrievedChunk> chunks) {
-        if (chunks.isEmpty()) {
+    static boolean isGoodEnough(List<RetrievedChunk> chunks) {
+        List<RetrievedChunk> rankedChunks = chunks.stream()
+                .sorted(Comparator.comparingDouble(RetrievedChunk::score).reversed())
+                .toList();
+        if (rankedChunks.isEmpty()) {
             return false;
         }
-        double topScore = chunks.getFirst().score();
+        double topScore = rankedChunks.getFirst().score();
         if (topScore >= SINGLE_STRONG_CHUNK_THRESHOLD) {
             return true;
         }
-        if (chunks.size() < 2 || topScore < TOP_SCORE_THRESHOLD) {
+        if (rankedChunks.size() < 2 || topScore < TOP_SCORE_THRESHOLD) {
             return false;
         }
-        int count = Math.min(3, chunks.size());
-        double averageTop = chunks.stream()
+        int count = Math.min(3, rankedChunks.size());
+        double averageTop = rankedChunks.stream()
                 .limit(count)
                 .mapToDouble(RetrievedChunk::score)
                 .average()

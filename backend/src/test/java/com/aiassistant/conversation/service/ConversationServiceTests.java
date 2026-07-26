@@ -118,4 +118,85 @@ class ConversationServiceTests {
                         }
                 );
     }
+
+    @Test
+    void retrievalContextSkipsRefusedTurnsAndUsesLastSuccessfulTurn() {
+        User owner = entityManager.persistFlushFind(new User("history@example.com", "hash", "Owner"));
+        Workspace workspace = entityManager.persistFlushFind(new Workspace(
+                owner,
+                "Backend",
+                "Spring app",
+                "Java",
+                "Spring Boot",
+                WorkspaceVisibility.PRIVATE
+        ));
+        WorkspaceService workspaceService = Mockito.mock(WorkspaceService.class);
+        when(workspaceService.requireExisting(workspace.getId())).thenReturn(workspace);
+        ConversationService service = new ConversationService(conversations, messages, workspaceService, new ObjectMapper());
+        RepositoryChatState successful = RepositoryChatState.start(workspace.getId(), null, "How does JwtAuthenticationFilter authenticate a request?", List.of())
+                .withRetrievalResult(new RetrievalResult(List.of(
+                        new RetrievedChunk(
+                                "jwt-filter",
+                                "src/main/java/JwtAuthenticationFilter.java",
+                                15,
+                                41,
+                                "JwtAuthenticationFilter.doFilterInternal",
+                                "JWT filter content",
+                                0.42)
+                )))
+                .withLlmResponse(new LlmService.LlmResponse(
+                        "It reads and validates the bearer token. [JwtAuthenticationFilter.java:15-41]",
+                        "openai/gpt-4.1",
+                        72))
+                .withCitations(List.of(new Citation(
+                        "jwt-filter",
+                        "src/main/java/JwtAuthenticationFilter.java",
+                        15,
+                        41,
+                        42,
+                        76,
+                        "[JwtAuthenticationFilter.java:15-41]")));
+
+        ConversationPersistencePort.PersistedConversationTurn persisted = service.persist(successful);
+        RepositoryChatState refused = RepositoryChatState.start(workspace.getId(), persisted.conversationId(), "What is the capital of France?", List.of())
+                .withRetrievalResult(RetrievalResult.empty())
+                .withRefusal(RepositoryChatState.INSUFFICIENT_CONTEXT_MESSAGE)
+                .withCitations(List.of());
+        service.persist(refused);
+
+        assertThat(service.lastSuccessfulTurnForRetrieval(owner.getId(), persisted.conversationId()))
+                .get()
+                .satisfies(context -> {
+                    assertThat(context.question()).isEqualTo("How does JwtAuthenticationFilter authenticate a request?");
+                    assertThat(context.answer()).contains("bearer token");
+                    assertThat(context.citations()).singleElement().satisfies(citation -> {
+                        assertThat(citation.chunkId()).isEqualTo("jwt-filter");
+                        assertThat(citation.filePath()).isEqualTo("src/main/java/JwtAuthenticationFilter.java");
+                    });
+                });
+    }
+
+    @Test
+    void retrievalContextIsEmptyWhenConversationOnlyContainsRefusals() {
+        User owner = entityManager.persistFlushFind(new User("only-refused@example.com", "hash", "Owner"));
+        Workspace workspace = entityManager.persistFlushFind(new Workspace(
+                owner,
+                "Backend",
+                "Spring app",
+                "Java",
+                "Spring Boot",
+                WorkspaceVisibility.PRIVATE
+        ));
+        WorkspaceService workspaceService = Mockito.mock(WorkspaceService.class);
+        when(workspaceService.requireExisting(workspace.getId())).thenReturn(workspace);
+        ConversationService service = new ConversationService(conversations, messages, workspaceService, new ObjectMapper());
+        RepositoryChatState refused = RepositoryChatState.start(workspace.getId(), null, "What is the capital of France?", List.of())
+                .withRetrievalResult(RetrievalResult.empty())
+                .withRefusal(RepositoryChatState.INSUFFICIENT_CONTEXT_MESSAGE)
+                .withCitations(List.of());
+
+        ConversationPersistencePort.PersistedConversationTurn persisted = service.persist(refused);
+
+        assertThat(service.lastSuccessfulTurnForRetrieval(owner.getId(), persisted.conversationId())).isEmpty();
+    }
 }

@@ -47,7 +47,8 @@ public class RepositoryChatService {
                 workspaceId,
                 request.conversationId(),
                 request.message(),
-                conversationService.historyForPrompt(ownerId, request.conversationId())
+                conversationService.historyForPrompt(ownerId, request.conversationId()),
+                conversationService.lastSuccessfulTurnForRetrieval(ownerId, request.conversationId())
         );
         return new ChatResponse(
                 result.conversationId(),
